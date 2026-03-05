@@ -1,49 +1,33 @@
 from ultralytics import YOLO
-import os
 import sys
 import cv2
 import time
 import winsound
 
-# Path to the trained model (update if needed)
-MODEL_PATH = 'weapon_detection.pt'  # or 'teeth_detection_model.pt' if that's your latest
+from video_utils import prepare_video_io, preview_and_save
+
+# Path to the trained model (car/accident damage)
+MODEL_PATH = 'car_damage_detection_model.pt'
 OUTPUT_DIR = 'video_results'
-VIDEO_PATH = r'C:\Users\rijul\Downloads\The_Contractor_2022_-_Best_Combat_Scenes_1080P.mp4'  # default; can override with CLI arg
-CONF_THRESHOLD = 0.45
+VIDEO_PATH = r'C:\Users\rijul\Downloads\car accident.mp4'  # default; can override with CLI arg
+CONF_THRESHOLD = 0.35
 IOU_THRESHOLD = 0.45
-MIN_BOX_AREA = 2500  # pixels^2; ignore tiny boxes
-THREAT_CLASSES = {
-    'gun',
-    'mask', 'masked_person',
-    'helmet', 'person_with_helmet',
-    'accident', 'crash', 'collision',
-    'car_crash', 'bike_crash', 'road_accident', 'vehicle_collision'
-}
+MIN_BOX_AREA = 1200  # pixels^2; ignore tiny boxes and small blobs
+# Only flag these classes
+THREAT_CLASSES = {'Car-Damage'}
 ALERT_COOLDOWN_SEC = 1.0
 if len(sys.argv) > 1:
     VIDEO_PATH = sys.argv[1]
 
-# Create output directory if it doesn't exist
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-# Load the trained model
 model = YOLO(MODEL_PATH)
 
-# Open the video file
-cap = cv2.VideoCapture(VIDEO_PATH)
-if not cap.isOpened():
-    raise RuntimeError(f"Could not open video: {VIDEO_PATH}")
-
-# Get video properties
-width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1280
-height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 720
-fps = cap.get(cv2.CAP_PROP_FPS) or 25
-
-# Output video writer
-output_path = os.path.join(OUTPUT_DIR, 'annotated', 'annotated_video.mp4')
-os.makedirs(os.path.dirname(output_path), exist_ok=True)
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+cap, out, output_path, width, height, fps = prepare_video_io(
+    VIDEO_PATH,
+    OUTPUT_DIR,
+    output_name='annotated_video.mp4',
+    fallback_size=(1280, 720),
+    fallback_fps=25,
+)
 
 last_alert_time = 0.0
 
@@ -55,7 +39,7 @@ while cap.isOpened():
     results = model(frame, verbose=False, conf=CONF_THRESHOLD, iou=IOU_THRESHOLD)
     annotated_frame = results[0].plot()
 
-    # Threat detection overlay
+    # Threat/damage detection overlay
     boxes = results[0].boxes
     names = results[0].names
     threat_detected = False
@@ -74,17 +58,12 @@ while cap.isOpened():
 
     if threat_detected:
         cv2.rectangle(annotated_frame, (0, 0), (width, 60), (0, 0, 255), -1)
-        cv2.putText(annotated_frame, 'THREAT DETECTED', (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(annotated_frame, 'DAMAGE DETECTED', (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (255, 255, 255), 2, cv2.LINE_AA)
         now = time.time()
         if now - last_alert_time >= ALERT_COOLDOWN_SEC:
             winsound.Beep(1200, 350)
             last_alert_time = now
-    # Resize for live preview
-    preview_frame = cv2.resize(annotated_frame, (1280, 720))
-    # Show live preview
-    cv2.imshow('Live Preview', preview_frame)
-    # Write frame to output video
-    out.write(annotated_frame)
+    preview_and_save(annotated_frame, out, preview_size=(1280, 720))
     # Press 'q' to quit early
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
