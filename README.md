@@ -1,76 +1,52 @@
-# CYPHER - AI Surveillance System Specification
+# AI Smart Surveillance (Detection Module)
 
-## 📋 Specification Files
+This project implements the **OpenCV + YOLO** real-time detection part for smart surveillance.
 
-This folder contains the complete specification for the CYPHER AI Surveillance Intelligence System.
+Scope included:
+- Live CCTV/webcam/RTSP frame processing.
+- YOLO object detection on each frame.
+- Real-time bounding boxes and threat status overlay (`THREAT` / `CLEAR`).
 
-### Core Specification Documents
+Scope intentionally excluded:
+- Notification systems.
+- SMS/phone alerts.
+- Law-enforcement dispatch integrations.
 
-1. **[requirements.md](requirements.md)** - System Requirements
-   - Functional requirements
-   - Non-functional requirements
-   - Acceptance criteria
-   - Data schemas
+## 1. Setup
 
-2. **[design.md](design.md)** - Technical Design
-   - System architecture
-   - Component design
-   - Algorithms and data flow
-   - Technology stack
-
-3. **[tasks.md](tasks.md)** - Implementation Tasks
-   - Phase-by-phase breakdown
-   - 150+ actionable tasks
-   - Time estimates (12-18 hours total)
-   - Priority levels
-
-## 🎯 System Overview
-
-CYPHER is an AI-powered surveillance system that:
-- Detects suspicious behavior in real-time using YOLOv8n
-- Automatically finds and alerts nearest authorities via geolocation
-- Dispatches multi-channel alerts (SMS + Email)
-- Provides public analytics dashboard for transparency
-
-## 🔄 Complete Workflow
-
-```
-Video Input → OpenCV → YOLOv8n → Behavior Engine → Re-verification
-    ↓
-Incident Generation (Location + Timestamp + Snapshot)
-    ↓
-Intelligent Agent (Find Nearest Authorities)
-    ↓
-Alert Dispatch (SMS + Email to Top 3 Authorities)
-    ↓
-Public Analytics Dashboard
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-## 📖 How to Use
+## 2. Run
 
-1. **Start with requirements.md** - Understand what the system does
-2. **Review design.md** - Understand how it's built
-3. **Follow tasks.md** - Implement the system step-by-step
+```powershell
+python detector.py --source 0 --model models/yolov8n.pt --threat-classes person
+```
 
-## ⏱️ Implementation Timeline
+If `models/yolov8n.pt` is not present, the script falls back to `yolov8n.pt` and downloads it automatically.
 
-- **Total Time:** 12-18 hours
-- **Phase 1:** Project Setup (1-2 hours)
-- **Phase 2:** Core Detection (2-3 hours)
-- **Phase 3:** Event Engine (1-2 hours)
-- **Phase 4:** Intelligence Layer (2-3 hours)
-- **Phase 5:** Alert Dispatch (2-3 hours)
-- **Phase 6:** Dashboards (2-3 hours)
-- **Phase 7:** Testing (1-2 hours)
+## 3. RTSP Example
 
-## 🛠️ Technology Stack
+```powershell
+python detector.py --source "rtsp://username:password@camera-ip:554/stream1" --model models/yolov8n.pt --threat-classes person
+```
 
-- **Backend:** Python 3.9+, FastAPI, OpenCV, YOLOv8n
-- **Frontend:** Vanilla JS, CSS3, Chart.js, Leaflet.js
-- **Infrastructure:** Appwrite Cloud, Twilio (SMS), SMTP (Email)
+## 4. Custom Threat Labels
 
----
+Use your trained model labels for better threat detection:
 
-**Status:** Specification Complete
-**Version:** 3.0 Final
-**Last Updated:** 2024
+```powershell
+python detector.py --source 0 --model models/custom_threat.pt --threat-classes knife,gun,weapon
+```
+
+## 5. Controls
+
+- Press `q` to quit.
+
+## 6. Notes
+
+- `yolov8n.pt` is a general model and may not detect weapons reliably.
+- For production-grade surveillance, train/fine-tune a domain model on threat classes.
