@@ -1,7 +1,8 @@
 from ultralytics import YOLO
-import os
 import cv2
 import numpy as np
+
+from video_utils import prepare_video_io, preview_and_save
 
 # Path to the trained segmentation model
 MODEL_PATH = 'car_damage_detection_model.pt'  # segmentation-only model
@@ -12,25 +13,15 @@ VIDEO_PATH = 'car damage video.mp4'  # Set your video path here
 CLASS_NAMES = ['Car-Damage']
 CLASS_COLORS = [(255, 255, 0)]  # fire: red, smoke: blue (BGR for OpenCV)
 
-# Create output directory if it doesn't exist
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-# Load the trained segmentation model
 model = YOLO(MODEL_PATH)
 
-# Open the video file
-cap = cv2.VideoCapture(VIDEO_PATH)
-
-# Get video properties
-width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-fps = cap.get(cv2.CAP_PROP_FPS)
-
-# Output video writer
-output_path = os.path.join(OUTPUT_DIR, 'annotated', 'annotated_video.mp4')
-os.makedirs(os.path.dirname(output_path), exist_ok=True)
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+cap, out, output_path, width, height, fps = prepare_video_io(
+    VIDEO_PATH,
+    OUTPUT_DIR,
+    output_name='annotated_video.mp4',
+    fallback_size=(1920, 1080),
+    fallback_fps=25,
+)
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -68,12 +59,7 @@ while cap.isOpened():
                     2,
                     cv2.LINE_AA
                 )
-    # Resize for live preview
-    preview_frame = cv2.resize(annotated_frame, (1920, 1080))
-    # Show live preview
-    cv2.imshow('Live Preview', preview_frame)
-    # Write frame to output video
-    out.write(annotated_frame)
+    preview_and_save(annotated_frame, out, preview_size=(1920, 1080))
     # Press 'q' to quit early
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
