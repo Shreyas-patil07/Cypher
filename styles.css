@@ -122,6 +122,7 @@ h4 {
   border-radius: 6px;
   padding: 0.7rem;
   background: #222d3d;
+  cursor: pointer;
 }
 
 .alert-card[data-type="accident"] {
@@ -161,6 +162,17 @@ h4 {
   line-height: 1.45;
 }
 
+.alert-clear-hint {
+  margin-top: 0.45rem;
+  padding: 0.2rem 0.42rem;
+  border: 1px solid #6d84a5;
+  border-radius: 4px;
+  background: #33445d;
+  color: #eef3fb;
+  font-weight: 600;
+  display: inline-block;
+}
+
 .sms-tag {
   display: inline-block;
   margin-top: 0.45rem;
@@ -168,8 +180,8 @@ h4 {
   padding: 0.16rem 0.44rem;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #d9f2e2;
-  background: #345944;
+  color: #d7e0ee;
+  background: #33445d;
 }
 
 .alerts-panel {
@@ -244,6 +256,19 @@ h4 {
 .map-stats h3 {
   font-size: 0.94rem;
   margin-bottom: 0.5rem;
+}
+
+.location-btn {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.heatmap-status {
+  margin: 0 0 0.7rem;
+  color: #c2ccdc;
+  font-size: 0.79rem;
+  line-height: 1.35;
 }
 
 .filter-group {

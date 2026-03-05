@@ -1,4 +1,4 @@
-const incidents = [
+let incidents = [
   {
     id: 1,
     type: "conflict",
@@ -177,7 +177,7 @@ const incidents = [
   }
 ];
 
-const zoneCoordinates = {
+let zoneCoordinates = {
   "Sector 5": { lat: 28.6135, lng: 77.2092 },
   "Sector 7": { lat: 28.6339, lng: 77.2192 },
   "Transit Hub": { lat: 28.6201, lng: 77.2422 },
@@ -216,44 +216,76 @@ const weeklyWeaponBar = document.getElementById("weeklyWeaponBar");
 const monthlyAccidentBar = document.getElementById("monthlyAccidentBar");
 const monthlyConflictBar = document.getElementById("monthlyConflictBar");
 const monthlyWeaponBar = document.getElementById("monthlyWeaponBar");
+const loadNearbyAlertsBtn = document.getElementById("loadNearbyAlertsBtn");
+const heatmapStatus = document.getElementById("heatmapStatus");
 
 const zoneMapElement = document.getElementById("zoneMap");
 
 let zoneMap = null;
 let heatLayers = [];
+let zoneLayerLookup = {};
 let selectedZone = null;
+let selectedIncidentId = null;
 let mapSelectionHandlerBound = false;
+let userLocationCenter = null;
 
 let activeFilter = "all";
+
+const defaultIncidents = incidents.slice();
+const defaultZoneCoordinates = { ...zoneCoordinates };
+const nearbyZones = ["North Block", "South Block", "East Block", "West Block", "Central Block", "Market Block"];
+const nearbyRoads = ["Main Road", "Station Lane", "Market Street", "Hospital Road", "Transit Point", "Ring Link"];
 
 function applyFilter(data) {
   if (activeFilter === "all") return data;
   return data.filter((item) => item.type === activeFilter);
 }
 
+function getAlertTimestamp(item) {
+  const parsed = Date.parse(`${item.date} ${item.time}`);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function getLatestIncidentByZone(data, zone) {
+  return data
+    .filter((item) => item.zone === zone)
+    .slice()
+    .sort((a, b) => {
+      const timeDiff = getAlertTimestamp(b) - getAlertTimestamp(a);
+      if (timeDiff !== 0) return timeDiff;
+      return b.id - a.id;
+    })[0] || null;
+}
+
+function clearMapSelection() {
+  selectedZone = null;
+  selectedIncidentId = null;
+  renderAlerts(applyFilter(incidents));
+  highlightSelectedMapZone();
+}
+
 function renderAlerts(filtered) {
   alertStream.innerHTML = "";
 
-  const alertsToShow = selectedZone
+  const zoneFiltered = selectedZone
     ? filtered.filter((item) => item.zone === selectedZone)
     : filtered;
+
+  const alertsToShow = selectedIncidentId
+    ? zoneFiltered.filter((item) => item.id === selectedIncidentId)
+    : zoneFiltered;
 
   if (!alertsToShow.length) {
     alertStream.innerHTML = "<p class='alert-meta'>No alerts found for this filter.</p>";
     return;
   }
 
-  if (selectedZone) {
+  if (!selectedIncidentId && selectedZone) {
     const focusNote = document.createElement("p");
     focusNote.className = "alert-meta";
-    focusNote.textContent = `Map Selection: ${selectedZone} (click empty map area to clear)`;
+    focusNote.textContent = `Map Selection: ${selectedZone} (click anywhere to clear)`;
     alertStream.appendChild(focusNote);
   }
-
-  const getAlertTimestamp = (item) => {
-    const parsed = Date.parse(`${item.date} ${item.time}`);
-    return Number.isNaN(parsed) ? 0 : parsed;
-  };
 
   alertsToShow
     .slice()
@@ -266,6 +298,7 @@ function renderAlerts(filtered) {
       const card = document.createElement("article");
       card.className = "alert-card";
       card.dataset.type = item.type;
+      card.tabIndex = 0;
 
       card.innerHTML = `
         <div class="alert-top">
@@ -276,8 +309,23 @@ function renderAlerts(filtered) {
           Location: ${item.location}<br>
           Time: ${item.time} | Date: ${item.date}
         </div>
-        <span class="sms-tag">SMS Alert Sent</span>
+        ${selectedIncidentId === item.id ? '<div class="alert-meta alert-clear-hint">click anywhere to clear</div>' : ""}
       `;
+
+      const applyCardSelection = () => {
+        selectedZone = item.zone;
+        selectedIncidentId = item.id;
+        renderAlerts(applyFilter(incidents));
+        highlightSelectedMapZone();
+      };
+
+      card.addEventListener("click", applyCardSelection);
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          applyCardSelection();
+        }
+      });
 
       alertStream.appendChild(card);
     });
@@ -302,13 +350,115 @@ function coreColor(level) {
   return "#ff8a00";
 }
 
+function updateHeatmapStatus(message) {
+  if (heatmapStatus) {
+    heatmapStatus.textContent = message;
+  }
+}
+
+function highlightSelectedMapZone() {
+  if (!zoneMap) return;
+
+  Object.entries(zoneLayerLookup).forEach(([zone, layerInfo]) => {
+    const isSelected = selectedZone === zone;
+
+    layerInfo.zoneCircle.setStyle({
+      color: layerInfo.color,
+      fillColor: layerInfo.color,
+      fillOpacity: isSelected ? 0.46 : 0.32,
+      weight: isSelected ? 2 : 1
+    });
+
+    layerInfo.coreMarker.setStyle({
+      color: isSelected ? "#ffffff" : "#f4f7fa",
+      fillColor: layerInfo.color,
+      fillOpacity: 0.95,
+      radius: isSelected ? 11 : layerInfo.baseRadius,
+      weight: isSelected ? 2 : 1
+    });
+  });
+
+  if (selectedZone && zoneLayerLookup[selectedZone]) {
+    const selected = zoneLayerLookup[selectedZone];
+    zoneMap.setView(selected.coordinates, Math.max(zoneMap.getZoom(), 13));
+    selected.coreMarker.openTooltip();
+  }
+}
+
+function createOffset(base, spread) {
+  return base + (Math.random() - 0.5) * spread;
+}
+
+function randomTime() {
+  const hour = Math.floor(Math.random() * 24);
+  const minute = Math.floor(Math.random() * 60);
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function formatDate(dateValue) {
+  const day = String(dateValue.getDate()).padStart(2, "0");
+  const month = dateValue.toLocaleString("en-US", { month: "short" });
+  const year = dateValue.getFullYear();
+  return `${day} ${month} ${year}`;
+}
+
+function nearbyType(index) {
+  const pool = ["conflict", "accident", "weapon", "conflict", "accident", "conflict"];
+  return pool[index % pool.length];
+}
+
+function alertLabel(type) {
+  if (type === "accident") return "Accident Detected";
+  if (type === "weapon") return "Weapon Detection Alert";
+  return "Human Conflict Detected";
+}
+
+function buildNearbyDataset(centerLat, centerLng) {
+  const generatedZoneCoordinates = {};
+
+  nearbyZones.forEach((zone) => {
+    generatedZoneCoordinates[zone] = {
+      lat: createOffset(centerLat, 0.06),
+      lng: createOffset(centerLng, 0.06)
+    };
+  });
+
+  const now = new Date();
+  const generatedIncidents = Array.from({ length: 16 }, (_, index) => {
+    const zone = nearbyZones[index % nearbyZones.length];
+    const type = nearbyType(index);
+    const daysAgo = index;
+    const dateValue = new Date(now);
+    dateValue.setDate(now.getDate() - daysAgo);
+
+    return {
+      id: index + 1,
+      type,
+      alert: alertLabel(type),
+      location: `${zone} ${nearbyRoads[index % nearbyRoads.length]}`,
+      zone,
+      time: randomTime(),
+      date: formatDate(dateValue),
+      week: daysAgo <= 6,
+      month: daysAgo <= 30
+    };
+  });
+
+  return {
+    incidents: generatedIncidents,
+    coordinates: generatedZoneCoordinates
+  };
+}
+
 function initZoneMap() {
   if (zoneMap || typeof L === "undefined") return;
+
+  const initialCenter = userLocationCenter || { lat: 28.622, lng: 77.218 };
 
   zoneMap = L.map(zoneMapElement, {
     zoomControl: true,
     attributionControl: true
-  }).setView([28.622, 77.218], 12);
+  }).setView([initialCenter.lat, initialCenter.lng], 12);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 18,
@@ -317,8 +467,7 @@ function initZoneMap() {
 
   if (!mapSelectionHandlerBound) {
     zoneMap.on("click", () => {
-      selectedZone = null;
-      renderAlerts(applyFilter(incidents));
+      clearMapSelection();
     });
     mapSelectionHandlerBound = true;
   }
@@ -329,6 +478,7 @@ function clearHeatLayers() {
     zoneMap.removeLayer(layer);
   });
   heatLayers = [];
+  zoneLayerLookup = {};
 }
 
 function renderHeatmap(filtered) {
@@ -343,6 +493,7 @@ function renderHeatmap(filtered) {
   Object.entries(zoneCoordinates).forEach(([zone, point]) => {
     const total = counts[zone] || 0;
     if (total === 0) return;
+    const representativeAlert = getLatestIncidentByZone(filtered, zone);
 
     const level = levelFromCount(total);
     const color = coreColor(level);
@@ -352,7 +503,8 @@ function renderHeatmap(filtered) {
       color,
       fillColor: color,
       fillOpacity: 0.32,
-      weight: 1
+      weight: 1,
+      bubblingMouseEvents: false
     }).bindTooltip(`${zone}: ${total} incidents`, {
       direction: "top"
     });
@@ -362,20 +514,35 @@ function renderHeatmap(filtered) {
       color: "#f4f7fa",
       weight: 1,
       fillColor: color,
-      fillOpacity: 0.95
+      fillOpacity: 0.95,
+      bubblingMouseEvents: false
     });
 
     zoneCircle.addTo(zoneMap);
     coreMarker.addTo(zoneMap);
 
-    zoneCircle.on("click", () => {
+    zoneLayerLookup[zone] = {
+      zoneCircle,
+      coreMarker,
+      color,
+      baseRadius: 5 + Math.min(total * 1.6, 8),
+      coordinates: [point.lat, point.lng]
+    };
+
+    zoneCircle.on("click", (event) => {
+      L.DomEvent.stopPropagation(event);
       selectedZone = zone;
+      selectedIncidentId = representativeAlert ? representativeAlert.id : null;
       renderAlerts(applyFilter(incidents));
+      highlightSelectedMapZone();
     });
 
-    coreMarker.on("click", () => {
+    coreMarker.on("click", (event) => {
+      L.DomEvent.stopPropagation(event);
       selectedZone = zone;
+      selectedIncidentId = representativeAlert ? representativeAlert.id : null;
       renderAlerts(applyFilter(incidents));
+      highlightSelectedMapZone();
     });
 
     heatLayers.push(zoneCircle, coreMarker);
@@ -383,8 +550,12 @@ function renderHeatmap(filtered) {
   });
 
   if (bounds.length > 0) {
-    zoneMap.fitBounds(bounds, { padding: [30, 30] });
+    if (!selectedZone || !zoneLayerLookup[selectedZone]) {
+      zoneMap.fitBounds(bounds, { padding: [30, 30] });
+    }
   }
+
+  highlightSelectedMapZone();
 }
 
 function countByType(data, type) {
@@ -479,6 +650,63 @@ function refreshDashboard() {
   renderReports(filtered);
 }
 
+function applyLocationBasedAlerts(latitude, longitude) {
+  userLocationCenter = { lat: latitude, lng: longitude };
+  const dataset = buildNearbyDataset(latitude, longitude);
+  incidents = dataset.incidents;
+  zoneCoordinates = dataset.coordinates;
+  selectedZone = null;
+  selectedIncidentId = null;
+  activeFilter = "all";
+
+  filterButtons.forEach((btn) => {
+    const shouldBeActive = btn.dataset.filter === "all";
+    btn.classList.toggle("active", shouldBeActive);
+    btn.setAttribute("aria-selected", shouldBeActive ? "true" : "false");
+  });
+
+  if (zoneMap) {
+    zoneMap.setView([latitude, longitude], 13);
+  }
+
+  refreshDashboard();
+}
+
+function requestLocationAndLoadAlerts() {
+  if (!navigator.geolocation) {
+    updateHeatmapStatus("Geolocation is not supported in this browser.");
+    return;
+  }
+
+  if (loadNearbyAlertsBtn) loadNearbyAlertsBtn.disabled = true;
+  updateHeatmapStatus("Requesting your location permission...");
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords;
+      updateHeatmapStatus("Location received. Scanning nearby area...");
+
+      setTimeout(() => {
+        applyLocationBasedAlerts(latitude, longitude);
+        updateHeatmapStatus(`Loaded nearby alerts around ${latitude.toFixed(4)}, ${longitude.toFixed(4)}.`);
+        if (loadNearbyAlertsBtn) loadNearbyAlertsBtn.disabled = false;
+      }, 2200);
+    },
+    () => {
+      incidents = defaultIncidents.slice();
+      zoneCoordinates = { ...defaultZoneCoordinates };
+      refreshDashboard();
+      updateHeatmapStatus("Unable to access location. Please allow permission and try again.");
+      if (loadNearbyAlertsBtn) loadNearbyAlertsBtn.disabled = false;
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 12000,
+      maximumAge: 0
+    }
+  );
+}
+
 filterButtons.forEach((button) => {
   button.addEventListener("click", () => {
     filterButtons.forEach((btn) => {
@@ -490,6 +718,7 @@ filterButtons.forEach((button) => {
     button.setAttribute("aria-selected", "true");
     activeFilter = button.dataset.filter;
     selectedZone = null;
+    selectedIncidentId = null;
     refreshDashboard();
   });
 });
@@ -510,6 +739,22 @@ reportTabs.forEach((tab) => {
     document.getElementById("weeklyPanel").hidden = !showWeekly;
     document.getElementById("monthlyPanel").hidden = showWeekly;
   });
+});
+
+if (loadNearbyAlertsBtn) {
+  loadNearbyAlertsBtn.addEventListener("click", requestLocationAndLoadAlerts);
+}
+
+document.addEventListener("click", (event) => {
+  if (!selectedIncidentId && !selectedZone) return;
+
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+
+  // Keep selection when user interacts with map layers or alert cards.
+  if (target.closest("#zoneMap") || target.closest(".alert-card")) return;
+
+  clearMapSelection();
 });
 
 refreshDashboard();
