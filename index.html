@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CYPHER VISION | Command Control Room</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="main-content">
+      <section class="card command-header">
+        <div class="command-header-top">
+          <h1>COMMAND CONTROL ROOM</h1>
+          <p>CYPHER VISION AI Surveillance System</p>
+        </div>
+        <div class="system-flow" aria-label="CYPHER VISION system concept flow">
+    
+        </div>
+      </section>
+
+      <section class="card alerts-panel">
+        <div class="card-head">
+          <h2> Alert Notifications</h2>
+          <p></p>
+        </div>
+        <div class="alerts-container">
+          <div id="alertStream" class="alert-stream" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="card heatmap-panel">
+        <div class="card-head">
+          <h2 class="heatmap-title">Incident Heatmap</h2>
+          <p></p>
+        </div>
+
+        <div class="heatmap-grid">
+          <article class="heatmap-main">
+            <div id="zoneMap" role="img" aria-label="Interactive incident map"></div>
+          </article>
+
+          <aside class="map-stats">
+            <h3>Alert Type Filters</h3>
+
+            <div id="filterGroup" class="filter-group" role="tablist" aria-label="Incident type filters">
+              <button class="filter-btn active" data-filter="all" role="tab" aria-selected="true">All Alerts</button>
+              <button class="filter-btn" data-filter="accident" role="tab" aria-selected="false">Accidents</button>
+              <button class="filter-btn" data-filter="conflict" role="tab" aria-selected="false">Human Conflicts</button>
+              <button class="filter-btn" data-filter="weapon" role="tab" aria-selected="false">Weapon Detection</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="card reports-panel">
+        <div class="card-head">
+          <h2>Analytical Incident Reports</h2>
+          <p> Weekly and Monthly Incident Intelligence Summary.</p>
+        </div>
+
+        <div class="report-tabs" role="tablist" aria-label="Report period tabs">
+          <button class="report-tab active" data-report-tab="weekly" role="tab" aria-selected="true">Weekly Report</button>
+          <button class="report-tab" data-report-tab="monthly" role="tab" aria-selected="false">Monthly Report</button>
+        </div>
+
+        <div id="weeklyPanel" class="report-panel active" role="tabpanel">
+          <div class="report-summary">
+            <article class="summary-card large">
+              <p>Total Alerts</p>
+              <h3 id="weeklyTotal">0</h3>
+            </article>
+            <article class="summary-card">
+              <p>Highest Incident Area</p>
+              <h3 id="weeklyHotspot">-</h3>
+            </article>
+          </div>
+
+          <div class="report-content-grid">
+            <article class="chart-card">
+              <h4>Incident Type Distribution</h4>
+              <div class="bar-chart" id="weeklyBars">
+                <div class="bar-row"><span>Accidents</span><div class="bar-track"><i id="weeklyAccidentBar"></i></div><strong id="weeklyAccidents">0</strong></div>
+                <div class="bar-row"><span>Human Conflicts</span><div class="bar-track"><i id="weeklyConflictBar"></i></div><strong id="weeklyConflicts">0</strong></div>
+                <div class="bar-row"><span>Weapon Detection</span><div class="bar-track"><i id="weeklyWeaponBar"></i></div><strong id="weeklyWeapons">0</strong></div>
+              </div>
+            </article>
+
+            <article class="table-card">
+              <h4>Most Common Locations</h4>
+              <table>
+                <thead>
+                  <tr><th>Location</th><th>Incidents</th></tr>
+                </thead>
+                <tbody id="weeklyLocationRows"></tbody>
+              </table>
+            </article>
+          </div>
+        </div>
+
+        <div id="monthlyPanel" class="report-panel" role="tabpanel" hidden>
+          <div class="report-summary">
+            <article class="summary-card large">
+              <p>Total Incidents Detected</p>
+              <h3 id="monthlyTotal">0</h3>
+            </article>
+            <article class="summary-card">
+              <p>Trend Pattern</p>
+              <h3 id="monthlyTrend">Stable</h3>
+            </article>
+          </div>
+
+          <div class="report-content-grid">
+            <article class="chart-card">
+              <h4>Accidents vs Human Conflicts</h4>
+              <div class="bar-chart">
+                <div class="bar-row"><span>Accidents</span><div class="bar-track"><i id="monthlyAccidentBar"></i></div><strong id="monthlyAccidents">0</strong></div>
+                <div class="bar-row"><span>Human Conflicts</span><div class="bar-track"><i id="monthlyConflictBar"></i></div><strong id="monthlyConflicts">0</strong></div>
+                <div class="bar-row"><span>Weapon Detection</span><div class="bar-track"><i id="monthlyWeaponBar"></i></div><strong id="monthlyWeapons">0</strong></div>
+              </div>
+              <p class="ratio-text">Accidents : Conflicts <strong id="monthlyAccidentConflict">0 : 0</strong></p>
+            </article>
+
+            <article class="table-card compact">
+              <h4>Monthly Location Summary</h4>
+              <table>
+                <thead>
+                  <tr><th>Zone</th><th>Count</th></tr>
+                </thead>
+                <tbody id="monthlyLocationRows"></tbody>
+              </table>
+              <p class="table-foot">Most Common Zone: <strong id="monthlyZone">-</strong></p>
+            </article>
+          </div>
+        </div>
+      </section>
+  </main>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="script.js"></script>
+</body>
+</html>
