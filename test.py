@@ -1,0 +1,31 @@
+from ultralytics import YOLO
+import os
+import sys
+
+# Path to the trained model (update if needed)
+MODEL_PATH = 'weapon_detection.pt'  # or 'teeth_detection_model.pt' if that's your latest
+TEST_IMAGES_DIR = 'dataset/test/images'
+OUTPUT_DIR = 'test_results'
+
+# Ensure required folders exist
+os.makedirs(TEST_IMAGES_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# Load the trained model
+model = YOLO(MODEL_PATH)
+
+# Gather test images
+image_files = [f for f in os.listdir(TEST_IMAGES_DIR) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+
+if not image_files:
+    print(f"No images found in '{TEST_IMAGES_DIR}'. Add .jpg/.jpeg/.png files and rerun.")
+    sys.exit(0)
+
+for img_name in image_files:
+    img_path = os.path.join(TEST_IMAGES_DIR, img_name)
+    # Run inference
+    results = model(img_path)
+    # Save the annotated image to the output directory
+    results[0].save(filename=os.path.join(OUTPUT_DIR, img_name))
+
+print(f"Processed {len(image_files)} images. Results saved to '{OUTPUT_DIR}' directory.")
